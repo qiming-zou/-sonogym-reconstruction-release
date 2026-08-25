@@ -79,7 +79,7 @@ def _request(method: str, url: str, token: str, data: bytes | None = None, conte
         headers["Content-Type"] = content_type
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=120) as response:
+        with urllib.request.urlopen(req, timeout=1800) as response:
             body = response.read()
             return json.loads(body.decode("utf-8")) if body else {}
     except urllib.error.HTTPError as exc:
