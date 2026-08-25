@@ -16,15 +16,12 @@ import urllib.request
 from importlib import resources
 from pathlib import Path
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 SHARD_COUNT = 32
 SHARD_PACKAGE_PREFIX = "sonogym_reconstruction_data_shard_"
 _CACHE_MARKER = ".sonogym_reconstruction_data_complete"
-DEFAULT_DATA_URL = (
-    "https://github.com/qiming-zou/-sonogym-reconstruction-release/releases/download/"
-    "sonogym-reconstruction-v0.1.2/sonogym_reconstruction_data_assets_0.1.1.tar.gz"
-)
+DEFAULT_DATA_URL = "https://github.com/qiming-zou/-sonogym-reconstruction-release/releases/download/sonogym-reconstruction-v0.1.3/sonogym_reconstruction_data_assets_0.1.1.tar.gz"
 DEFAULT_DATA_SHA256 = "c82f6a3445ae240eb20fb870a5cce2bf6915a45b2ea80c2035faa89c36a018d9"
 _REQUIRED_RELATIVE_DIRS = (
     "HumanModels/selected_dataset",
@@ -34,10 +31,67 @@ _REQUIRED_RELATIVE_DIRS = (
     "Robots",
     "SurgicalTools",
 )
+_PATIENT_IDS = (
+    "s0004",
+    "s0006",
+    "s0010",
+    "s0012",
+    "s0014",
+    "s0015",
+    "s0024",
+    "s0028",
+    "s0029",
+    "s0030",
+    "s0034",
+    "s0038",
+)
+_REQUIRED_RELATIVE_FILES = (
+    "Robots/Kuka/med14/kuka_US.usd",
+    "MedicalBed/usd_no_contact/hospital_bed.usd",
+    "SurgicalTools/US_probes/stl/linear.usd",
+)
 
 
 def _has_required_layout(path: Path) -> bool:
-    return all((path / relative).is_dir() for relative in _REQUIRED_RELATIVE_DIRS)
+    if not all((path / relative).is_dir() for relative in _REQUIRED_RELATIVE_DIRS):
+        return False
+    if not all((path / relative).is_file() for relative in _REQUIRED_RELATIVE_FILES):
+        return False
+    for patient_id in _PATIENT_IDS:
+        required = (
+            f"HumanModels/selected_dataset/{patient_id}/ct.nii.gz",
+            f"HumanModels/selected_dataset_stl/{patient_id}/combined_label_map.nii.gz",
+            f"HumanModels/selected_dataset_stl/{patient_id}/body_lowest_y_array.pt",
+            f"HumanModels/selected_dataset_stl/{patient_id}/body_surface_normal_array.pt",
+            f"HumanModels/selected_dataset_stl/{patient_id}/vertebrae_L4.stl",
+            f"HumanModels/selected_dataset_stl/{patient_id}/standard_right_traj_L4.stl",
+            f"HumanModels/selected_dataset_body_from_urdf/{patient_id}/combined_wrapwrap/combined_wrapwrap.usd",
+            f"HumanModels/selected_dataset_body_from_urdf/{patient_id}/combined_wrapwrap/configuration/combined_wrapwrap_base.usd",
+            f"HumanModels/selected_dataset_body_from_urdf/{patient_id}/combined_wrapwrap/configuration/combined_wrapwrap_physics.usd",
+            f"HumanModels/selected_dataset_body_from_urdf/{patient_id}/combined_wrapwrap/configuration/combined_wrapwrap_sensor.usd",
+        )
+        if not all((path / relative).is_file() for relative in required):
+            return False
+    return True
+
+
+def _marker_is_current(marker: Path) -> bool:
+    if not marker.exists():
+        return False
+    try:
+        values = {}
+        for line in marker.read_text(encoding="utf-8").splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key.strip()] = value.strip()
+    except OSError:
+        return False
+    if values.get("version") != __version__:
+        return False
+    expected = _expected_sha256()
+    if expected and values.get("sha256") != expected:
+        return False
+    return True
 
 
 def _cache_assets_dir() -> Path:
@@ -111,7 +165,7 @@ def _link_or_copy_file(source: Path, destination: Path) -> None:
 def _materialize_shards() -> Path:
     target = _cache_assets_dir()
     marker = target.parent / _CACHE_MARKER
-    if marker.exists() and _has_required_layout(target):
+    if _marker_is_current(marker) and _has_required_layout(target):
         return target
 
     shard_dirs = _shard_assets_dirs()
@@ -129,7 +183,10 @@ def _materialize_shards() -> Path:
             f"assets directory is incomplete: {target}"
         )
 
-    marker.write_text(f"version={__version__}\nshards={SHARD_COUNT}\n", encoding="utf-8")
+    marker.write_text(
+        f"version={__version__}\nshards={SHARD_COUNT}\nsha256={_expected_sha256()}\n",
+        encoding="utf-8",
+    )
     return target
 
 
@@ -188,7 +245,7 @@ def _safe_extract_tar(archive: Path, destination: Path) -> None:
 def _download_and_extract() -> Path:
     target = _cache_assets_dir()
     marker = target.parent / _CACHE_MARKER
-    if marker.exists() and _has_required_layout(target):
+    if _marker_is_current(marker) and _has_required_layout(target):
         return target
 
     url = _download_url()
@@ -215,7 +272,7 @@ def _download_and_extract() -> Path:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(extracted), str(target))
 
-    marker.write_text(f"version={__version__}\nurl={url}\n", encoding="utf-8")
+    marker.write_text(f"version={__version__}\nurl={url}\nsha256={expected}\n", encoding="utf-8")
     return target
 
 

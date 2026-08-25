@@ -7,7 +7,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="sonogym-reconstruction-data",
-    version="0.1.1",
+    version="0.1.2",
     description="SonoGym reconstruction data locator and automatic downloader.",
     packages=find_packages(),
     python_requires=">=3.10",

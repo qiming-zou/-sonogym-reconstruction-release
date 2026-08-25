@@ -19,7 +19,7 @@ INSTALL_REQUIRES = [
     "pyvista",
     "ruamel.yaml",
     "scipy",
-    "sonogym-reconstruction-data==0.1.1",
+    "sonogym-reconstruction-data==0.1.2",
 ]
 
 
