@@ -1,0 +1,12 @@
+include config/extension.toml
+recursive-include spinal_surgery *.py
+recursive-include spinal_surgery *.yaml
+recursive-include spinal_surgery *.toml
+recursive-include spinal_surgery *.usd
+recursive-include spinal_surgery *.usda
+recursive-include spinal_surgery *.urdf
+recursive-include spinal_surgery *.stl
+recursive-include spinal_surgery *.pt
+recursive-exclude spinal_surgery/assets/data/HumanModels *
+recursive-exclude spinal_surgery __pycache__ *
+recursive-exclude spinal_surgery *.py[cod]

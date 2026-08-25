@@ -1,0 +1,5 @@
+{
+  "description": "Fixed patient split for reconstruction-only anatomy-prior offline RL.",
+  "train": ["s0004", "s0006", "s0010", "s0012", "s0014", "s0015", "s0024", "s0028"],
+  "test": ["s0029", "s0030", "s0034", "s0038"]
+}
