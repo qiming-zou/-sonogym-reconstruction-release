@@ -586,6 +586,13 @@ class roboticUSRecEnv(DirectRLEnv):
         cmd_state = self.surface_reconstructor.human_cmd_state_from_ee_pose(
             self.human_to_ee_pos, self.human_to_ee_quat
         )
+        actual_surface_contact_pos = self.surface_reconstructor.human_surface_contact_from_ee_pose(
+            self.human_to_ee_pos, self.human_to_ee_quat
+        )
+        target_surface_contact_pos = self.surface_reconstructor.target_position * self.surface_reconstructor.label_res
+        surface_contact_error = torch.linalg.norm(
+            actual_surface_contact_pos - target_surface_contact_pos, dim=-1
+        )
         self.total_l, self.pos_l, self.rot_l = self.get_traj_length(
             self.cmd_state, cmd_state
         )
@@ -609,6 +616,10 @@ class roboticUSRecEnv(DirectRLEnv):
         self.extras["human_to_ee_pos"] = self.human_to_ee_pos
         self.extras["human_to_ee_quat"] = self.human_to_ee_quat
         self.extras["cur_cmd_state"] = self.cmd_state
+        self.extras["actual_surface_contact_pos"] = actual_surface_contact_pos
+        self.extras["target_surface_contact_pos"] = target_surface_contact_pos
+        self.extras["surface_contact_error_m"] = surface_contact_error
+        self.extras["no_collide"] = self.surface_reconstructor.no_collide
 
         if scene_cfg["if_record_traj"]:
             self.cmd_pose_trajs.append(self.cmd_state)
@@ -763,6 +774,9 @@ class roboticUSRecEnv(DirectRLEnv):
             self.surface_reconstructor.human_to_ee_target_pos,
             self.surface_reconstructor.human_to_ee_target_quat,
         )
+        self.US_ee_pose_w = self.robot.data.body_state_w[
+            :, self.robot_entity_cfg.body_ids[-1], 0:7
+        ]
 
         # actions: dx, dz: in image frame
         self.human_to_ee_pos, self.human_to_ee_quat = subtract_frame_transforms(
@@ -795,6 +809,16 @@ class roboticUSRecEnv(DirectRLEnv):
         self.extras["human_to_ee_pos"] = self.human_to_ee_pos
         self.extras["human_to_ee_quat"] = self.human_to_ee_quat
         self.extras["cur_cmd_state"] = self.cmd_state
+        actual_surface_contact_pos = self.surface_reconstructor.human_surface_contact_from_ee_pose(
+            self.human_to_ee_pos, self.human_to_ee_quat
+        )
+        target_surface_contact_pos = self.surface_reconstructor.target_position * self.surface_reconstructor.label_res
+        self.extras["actual_surface_contact_pos"] = actual_surface_contact_pos
+        self.extras["target_surface_contact_pos"] = target_surface_contact_pos
+        self.extras["surface_contact_error_m"] = torch.linalg.norm(
+            actual_surface_contact_pos - target_surface_contact_pos, dim=-1
+        )
+        self.extras["no_collide"] = self.surface_reconstructor.no_collide
 
         if scene_cfg["if_record_traj"]:
             record_path = PACKAGE_DIR + scene_cfg["record_path"]

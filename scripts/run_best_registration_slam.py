@@ -721,6 +721,8 @@ def main() -> int:
     coverage_trace = []
     blend_weight_trace = []
     stats_trace = []
+    surface_contact_error_trace = []
+    no_collide_trace = []
 
     for step in range(args.steps):
         goal = planner.goal(info["cur_cmd_state"], step).to(task_env.sim.device)
@@ -736,6 +738,8 @@ def main() -> int:
         coverage_trace.append(task_env.surface_reconstructor.get_converage_ratio().detach().cpu())
         blend_weight_trace.append(registration_prior.blend_weight(task_env.surface_reconstructor.human_rec_volume).detach().cpu())
         stats_trace.append(list(registration_prior.last_registration_stats))
+        surface_contact_error_trace.append(info["surface_contact_error_m"].detach().cpu())
+        no_collide_trace.append(info["no_collide"].detach().cpu())
         if torch.any(torch.logical_or(terminated, truncated)).item() and step < args.steps - 1:
             print(f"[WARN] rollout ended at step {step + 1}; requested {args.steps}.")
             break
@@ -756,6 +760,8 @@ def main() -> int:
         "mean_final_coverage": float(final_coverage.mean().item()),
         "blend_weight_trace": torch.stack(blend_weight_trace, dim=1),
         "registration_stats_trace": stats_trace,
+        "surface_contact_error_m": torch.stack(surface_contact_error_trace, dim=1),
+        "no_collide_trace": torch.stack(no_collide_trace, dim=1),
         "anatomy_prior": str(prior_path),
         "anatomy_prior_volume": anatomy_prior["prior_volume"].detach().cpu(),
         "final_registration_prior_volume": planner.prior_volume.detach().cpu(),

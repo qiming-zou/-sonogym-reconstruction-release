@@ -2,7 +2,7 @@ from spinal_surgery.lab.kinematics.human_frame_viewer import HumanFrameViewer
 import torch
 import numpy as np
 from spinal_surgery.lab.kinematics.utils import *
-from isaaclab.utils.math import combine_frame_transforms, transform_points, quat_from_matrix
+from isaaclab.utils.math import combine_frame_transforms, transform_points, quat_from_matrix, matrix_from_quat
 import os
 import time
 import warp as wp
@@ -147,8 +147,35 @@ class SurfaceMotionPlanner(HumanFrameViewer):
         self.target_x_axis_proj[:, 1] = 0
         self.target_x_axis_proj[:, 2] = torch.sin(self.current_x_z_x_angle_cmd[:, 2])
 
-        target_y_axis = torch.cross(self.target_z_axis, self.target_x_axis_proj, dim=-1) # (num_envs / n, 3)
+        self.target_z_axis = self.target_z_axis / torch.linalg.norm(
+            self.target_z_axis, dim=-1, keepdim=True
+        ).clamp_min(1e-6)
+        self.target_x_axis_proj = self.target_x_axis_proj - (
+            torch.sum(self.target_x_axis_proj * self.target_z_axis, dim=-1, keepdim=True)
+            * self.target_z_axis
+        )
+        degenerate_x = torch.linalg.norm(self.target_x_axis_proj, dim=-1) < 1e-6
+        if torch.any(degenerate_x):
+            fallback_x = torch.zeros_like(self.target_x_axis_proj)
+            fallback_x[:, 0] = 1.0
+            fallback_x = fallback_x - (
+                torch.sum(fallback_x * self.target_z_axis, dim=-1, keepdim=True) * self.target_z_axis
+            )
+            fallback_z = torch.zeros_like(self.target_x_axis_proj)
+            fallback_z[:, 2] = 1.0
+            fallback_x = torch.where(
+                torch.linalg.norm(fallback_x, dim=-1, keepdim=True) < 1e-6,
+                fallback_z,
+                fallback_x,
+            )
+            self.target_x_axis_proj = torch.where(degenerate_x[:, None], fallback_x, self.target_x_axis_proj)
+        target_x_axis = self.target_x_axis_proj / torch.linalg.norm(
+            self.target_x_axis_proj, dim=-1, keepdim=True
+        ).clamp_min(1e-6)
+        target_y_axis = torch.cross(self.target_z_axis, target_x_axis, dim=-1)
+        target_y_axis = target_y_axis / torch.linalg.norm(target_y_axis, dim=-1, keepdim=True).clamp_min(1e-6)
         target_x_axis = torch.cross(target_y_axis, self.target_z_axis, dim=-1)
+        target_x_axis = target_x_axis / torch.linalg.norm(target_x_axis, dim=-1, keepdim=True).clamp_min(1e-6)
 
         # rotation assign # adjust roll
         self.target_rot_mat[:, :, 0] = target_x_axis
@@ -179,6 +206,11 @@ class SurfaceMotionPlanner(HumanFrameViewer):
         )
 
         return world_to_ee_target_pos, world_to_ee_target_rot
+
+    def human_surface_contact_from_ee_pose(self, human_to_target_pos, human_to_target_quat):
+        rot_mat = matrix_from_quat(human_to_target_quat)
+        z_axis = rot_mat[:, :, 2]
+        return human_to_target_pos + z_axis * self.height
     
     
     def update_cmd(self, d_x_z_x_angle):

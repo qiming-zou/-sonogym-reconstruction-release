@@ -26,7 +26,7 @@ from pathlib import Path
 
 
 DEFAULT_ASSETS = [
-    "dist/sonogym_reconstruction_core-0.1.3-py3-none-any.whl",
+    "dist/sonogym_reconstruction_core-0.1.4-py3-none-any.whl",
     "dist/sonogym_reconstruction_data-0.1.2-py3-none-any.whl",
     "dist/sonogym_reconstruction_data_assets_0.1.1.tar.gz",
 ]
