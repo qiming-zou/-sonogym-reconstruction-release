@@ -723,6 +723,12 @@ def main() -> int:
     stats_trace = []
     surface_contact_error_trace = []
     no_collide_trace = []
+    slice_has_label_trace = []
+    slice_first_nonzero_trace = []
+    slice_nonzero_count_trace = []
+    slice_bone_pixel_count_trace = []
+    slice_bone_edge_pixel_count_trace = []
+    slice_target_edge_pixel_count_trace = []
 
     for step in range(args.steps):
         goal = planner.goal(info["cur_cmd_state"], step).to(task_env.sim.device)
@@ -740,6 +746,12 @@ def main() -> int:
         stats_trace.append(list(registration_prior.last_registration_stats))
         surface_contact_error_trace.append(info["surface_contact_error_m"].detach().cpu())
         no_collide_trace.append(info["no_collide"].detach().cpu())
+        slice_has_label_trace.append(info["slice_has_label"].detach().cpu())
+        slice_first_nonzero_trace.append(info["slice_first_nonzero"].detach().cpu())
+        slice_nonzero_count_trace.append(info["slice_nonzero_count"].detach().cpu())
+        slice_bone_pixel_count_trace.append(info["slice_bone_pixel_count"].detach().cpu())
+        slice_bone_edge_pixel_count_trace.append(info["slice_bone_edge_pixel_count"].detach().cpu())
+        slice_target_edge_pixel_count_trace.append(info["slice_target_edge_pixel_count"].detach().cpu())
         if torch.any(torch.logical_or(terminated, truncated)).item() and step < args.steps - 1:
             print(f"[WARN] rollout ended at step {step + 1}; requested {args.steps}.")
             break
@@ -762,6 +774,12 @@ def main() -> int:
         "registration_stats_trace": stats_trace,
         "surface_contact_error_m": torch.stack(surface_contact_error_trace, dim=1),
         "no_collide_trace": torch.stack(no_collide_trace, dim=1),
+        "slice_has_label_trace": torch.stack(slice_has_label_trace, dim=1),
+        "slice_first_nonzero_trace": torch.stack(slice_first_nonzero_trace, dim=1),
+        "slice_nonzero_count_trace": torch.stack(slice_nonzero_count_trace, dim=1),
+        "slice_bone_pixel_count_trace": torch.stack(slice_bone_pixel_count_trace, dim=1),
+        "slice_bone_edge_pixel_count_trace": torch.stack(slice_bone_edge_pixel_count_trace, dim=1),
+        "slice_target_edge_pixel_count_trace": torch.stack(slice_target_edge_pixel_count_trace, dim=1),
         "anatomy_prior": str(prior_path),
         "anatomy_prior_volume": anatomy_prior["prior_volume"].detach().cpu(),
         "final_registration_prior_volume": planner.prior_volume.detach().cpu(),
@@ -775,6 +793,15 @@ def main() -> int:
         "steps": output["steps"],
         "final_coverage": [float(value) for value in final_coverage.tolist()],
         "mean_final_coverage": output["mean_final_coverage"],
+        "slice_has_label_rate": [
+            float(value) for value in output["slice_has_label_trace"].float().mean(dim=1).tolist()
+        ],
+        "no_collide_rate": [
+            float(value) for value in output["no_collide_trace"].float().mean(dim=1).tolist()
+        ],
+        "mean_target_edge_pixels": [
+            float(value) for value in output["slice_target_edge_pixel_count_trace"].float().mean(dim=1).tolist()
+        ],
         "output": str(output_path),
     }
     summary_path = Path(args.summary_json) if args.summary_json else output_path.with_suffix(".json")

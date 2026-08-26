@@ -96,6 +96,11 @@ class LabelImgSlicer(SurfaceMotionPlanner):
             device=self.device,
         )  # (num_envs, w, h)
         self.no_collide = torch.zeros((self.num_envs,), dtype=torch.bool, device=self.device)
+        self.slice_has_label = torch.zeros((self.num_envs,), dtype=torch.bool, device=self.device)
+        self.slice_nonzero_count = torch.zeros((self.num_envs,), dtype=torch.int64, device=self.device)
+        self.slice_first_nonzero = torch.full(
+            (self.num_envs,), self.img_size[1], dtype=torch.long, device=self.device
+        )
 
         # construct grids
         self.x_grid, self.z_grid, self.y_grid = torch.meshgrid(
@@ -105,10 +110,8 @@ class LabelImgSlicer(SurfaceMotionPlanner):
             - self.img_thickness // 2,
         )  # (w, h, e, 1)
         # self.y_grid = torch.zeros_like(self.x_grid, device=self.device)
-        # Image height is ultrasound depth and must follow the probe normal
-        # (the EE local z axis); image thickness uses the local y axis.
         self.img_coords = (
-            torch.stack([self.x_grid, self.z_grid, self.y_grid], dim=-1)
+            torch.stack([self.x_grid, self.y_grid, self.z_grid], dim=-1)
             .reshape((-1, 3))
             .float()
             * img_res
@@ -214,16 +217,28 @@ class LabelImgSlicer(SurfaceMotionPlanner):
         """
         B, W, H, E = label_img_tensor.shape
 
-        # Find the first nonzero index along the height dimension (axis=1)
-        first_nonzero = torch.argmax((label_img_tensor > 0).int(), dim=2)  # (N, W, E)
-        return torch.amin(first_nonzero, dim=(1, 2))  # (N, )
+        nonzero = label_img_tensor > 0
+        ray_has_label = torch.any(nonzero, dim=2)  # (N, W, E)
+        first_nonzero_per_ray = torch.argmax(nonzero.int(), dim=2)  # (N, W, E)
+        first_nonzero_per_ray = torch.where(
+            ray_has_label,
+            first_nonzero_per_ray,
+            torch.full_like(first_nonzero_per_ray, H),
+        )
+        self.slice_has_label = torch.any(ray_has_label, dim=(1, 2))
+        self.slice_nonzero_count = torch.sum(nonzero, dim=(1, 2, 3))
+        self.slice_first_nonzero = torch.amin(first_nonzero_per_ray, dim=(1, 2))
+        return self.slice_first_nonzero  # (N, )
 
     def check_collision(self, label_img_tensor, ct_img_tensor):
         """
         check collision
         """
         first_nonzero = self.get_distances_from_label_img(label_img_tensor)
-        self.no_collide = first_nonzero > self.max_distance / self.label_res
+        self.no_collide = torch.logical_or(
+            torch.logical_not(self.slice_has_label),
+            first_nonzero > self.max_distance / self.label_res,
+        )
         label_img_tensor[self.no_collide] = 0
         ct_img_tensor[self.no_collide] = 0
 

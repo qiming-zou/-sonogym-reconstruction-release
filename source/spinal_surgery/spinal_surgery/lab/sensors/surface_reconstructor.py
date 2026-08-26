@@ -73,6 +73,9 @@ class SurfaceReconstructor(LabelImgSlicer):
         
         # missing rate of reconstruction
         self.missing_rate = missing_rate
+        self.slice_bone_pixel_count = torch.zeros((self.num_envs,), dtype=torch.int64, device=self.device)
+        self.slice_bone_edge_pixel_count = torch.zeros((self.num_envs,), dtype=torch.int64, device=self.device)
+        self.slice_target_edge_pixel_count = torch.zeros((self.num_envs,), dtype=torch.int64, device=self.device)
         
          # volume in ultrasound frame
         self.US_rec_volume = torch.zeros((self.num_envs,) + tuple(volume_size)).to(self.device)
@@ -189,6 +192,9 @@ class SurfaceReconstructor(LabelImgSlicer):
         
         bone_map_edge = torch.logical_and(bone_map_edge, rand_select)
         bone_map_target = torch.logical_and(self.label_img_tensor == self.target_vertebra_label, bone_map_edge)
+        self.slice_bone_pixel_count = torch.sum(bone_map, dim=(1, 2, 3))
+        self.slice_bone_edge_pixel_count = torch.sum(bone_map_edge, dim=(1, 2, 3))
+        self.slice_target_edge_pixel_count = torch.sum(bone_map_target, dim=(1, 2, 3))
         
         return bone_map_edge, bone_map_target
     
@@ -370,6 +376,15 @@ class SurfaceReconstructor(LabelImgSlicer):
         self.roll_adj = torch.zeros((self.num_envs, 1), device=self.device)
         self.incremental_cov = torch.zeros((self.num_envs,), device=self.device)
         self.cur_cov = torch.zeros((self.num_envs,), device=self.device)
+        self.no_collide = torch.zeros((self.num_envs,), dtype=torch.bool, device=self.device)
+        self.slice_has_label = torch.zeros((self.num_envs,), dtype=torch.bool, device=self.device)
+        self.slice_nonzero_count = torch.zeros((self.num_envs,), dtype=torch.int64, device=self.device)
+        self.slice_first_nonzero = torch.full(
+            (self.num_envs,), self.img_size[1], dtype=torch.long, device=self.device
+        )
+        self.slice_bone_pixel_count = torch.zeros((self.num_envs,), dtype=torch.int64, device=self.device)
+        self.slice_bone_edge_pixel_count = torch.zeros((self.num_envs,), dtype=torch.int64, device=self.device)
+        self.slice_target_edge_pixel_count = torch.zeros((self.num_envs,), dtype=torch.int64, device=self.device)
 
 
         

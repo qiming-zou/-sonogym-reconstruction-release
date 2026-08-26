@@ -620,6 +620,12 @@ class roboticUSRecEnv(DirectRLEnv):
         self.extras["target_surface_contact_pos"] = target_surface_contact_pos
         self.extras["surface_contact_error_m"] = surface_contact_error
         self.extras["no_collide"] = self.surface_reconstructor.no_collide
+        self.extras["slice_has_label"] = self.surface_reconstructor.slice_has_label
+        self.extras["slice_first_nonzero"] = self.surface_reconstructor.slice_first_nonzero
+        self.extras["slice_nonzero_count"] = self.surface_reconstructor.slice_nonzero_count
+        self.extras["slice_bone_pixel_count"] = self.surface_reconstructor.slice_bone_pixel_count
+        self.extras["slice_bone_edge_pixel_count"] = self.surface_reconstructor.slice_bone_edge_pixel_count
+        self.extras["slice_target_edge_pixel_count"] = self.surface_reconstructor.slice_target_edge_pixel_count
 
         if scene_cfg["if_record_traj"]:
             self.cmd_pose_trajs.append(self.cmd_state)
@@ -819,6 +825,12 @@ class roboticUSRecEnv(DirectRLEnv):
             actual_surface_contact_pos - target_surface_contact_pos, dim=-1
         )
         self.extras["no_collide"] = self.surface_reconstructor.no_collide
+        self.extras["slice_has_label"] = self.surface_reconstructor.slice_has_label
+        self.extras["slice_first_nonzero"] = self.surface_reconstructor.slice_first_nonzero
+        self.extras["slice_nonzero_count"] = self.surface_reconstructor.slice_nonzero_count
+        self.extras["slice_bone_pixel_count"] = self.surface_reconstructor.slice_bone_pixel_count
+        self.extras["slice_bone_edge_pixel_count"] = self.surface_reconstructor.slice_bone_edge_pixel_count
+        self.extras["slice_target_edge_pixel_count"] = self.surface_reconstructor.slice_target_edge_pixel_count
 
         if scene_cfg["if_record_traj"]:
             record_path = PACKAGE_DIR + scene_cfg["record_path"]

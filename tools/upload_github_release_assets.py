@@ -26,9 +26,8 @@ from pathlib import Path
 
 
 DEFAULT_ASSETS = [
-    "dist/sonogym_reconstruction_core-0.1.4-py3-none-any.whl",
+    "dist/sonogym_reconstruction_core-0.1.5-py3-none-any.whl",
     "dist/sonogym_reconstruction_data-0.1.2-py3-none-any.whl",
-    "dist/sonogym_reconstruction_data_assets_0.1.1.tar.gz",
 ]
 
 DATA_INIT = Path("source/sonogym_reconstruction_data/sonogym_reconstruction_data/__init__.py")
