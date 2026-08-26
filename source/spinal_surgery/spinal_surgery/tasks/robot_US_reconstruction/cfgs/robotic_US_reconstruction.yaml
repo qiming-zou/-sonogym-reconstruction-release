@@ -16,8 +16,8 @@ bed:
 motion_planning:
   vertebra_to_US_2d_pos: [0.0, 0.0]
   US_roll_adj: 0.0
-  vertebra_to_US_rand_max: 10.0
-  US_roll_rand_max: 0.1
+  vertebra_to_US_rand_max: 0.0
+  US_roll_rand_max: 0.0
   
 
 reconstruction:
@@ -49,6 +49,8 @@ sim:
   vis_us: False
   vis_rec: False
   vis_seg_map: False
+  kinematic_ik_servo: True
+  ik_servo_max_joint_step: 0.05
 
 if_record_traj: True
 record_path: /recordings/robot_US_reconstruction/

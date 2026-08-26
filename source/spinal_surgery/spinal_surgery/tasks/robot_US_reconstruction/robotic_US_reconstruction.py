@@ -312,6 +312,8 @@ class roboticUSRecEnv(DirectRLEnv):
 
         # reward
         self.rew_cfg = scene_cfg["reward"]
+        self.kinematic_ik_servo = bool(scene_cfg["sim"].get("kinematic_ik_servo", True))
+        self.ik_servo_max_joint_step = float(scene_cfg["sim"].get("ik_servo_max_joint_step", 0.05))
 
     def get_US_init_pose(self):
         # compute position change
@@ -565,19 +567,38 @@ class roboticUSRecEnv(DirectRLEnv):
             self.US_ee_pose_w[:, 0:3],
             self.US_ee_pose_w[:, 3:7],
         )
-        # # get joint position targets
+        self._apply_ik_command(self.US_ee_pos_b, self.US_ee_quat_b)
+
+    def _apply_ik_command(self, ee_pos_b: torch.Tensor, ee_quat_b: torch.Tensor) -> torch.Tensor:
         US_jacobian = self.robot.root_physx_view.get_jacobians()[
             :, self.US_ee_jacobi_idx - 1, :, self.robot_entity_cfg.joint_ids
         ]
         US_joint_pos = self.robot.data.joint_pos[:, self.robot_entity_cfg.joint_ids]
-        # compute the joint commands
         joint_pos_des = self.pose_diff_ik_controller.compute(
-            self.US_ee_pos_b, self.US_ee_quat_b, US_jacobian, US_joint_pos
+            ee_pos_b, ee_quat_b, US_jacobian, US_joint_pos
         )
-        # apply joint oosition target
-        self.robot.set_joint_position_target(
-            joint_pos_des, joint_ids=self.robot_entity_cfg.joint_ids
-        )
+        joint_pos_cmd = joint_pos_des
+        if self.kinematic_ik_servo:
+            joint_delta = torch.clamp(
+                joint_pos_des - US_joint_pos,
+                min=-self.ik_servo_max_joint_step,
+                max=self.ik_servo_max_joint_step,
+            )
+            joint_pos_cmd = US_joint_pos + joint_delta
+            joint_limits = self.robot.data.soft_joint_pos_limits[:, self.robot_entity_cfg.joint_ids, :]
+            joint_pos_cmd = torch.clamp(
+                joint_pos_cmd,
+                min=joint_limits[:, :, 0],
+                max=joint_limits[:, :, 1],
+            )
+        self.robot.set_joint_position_target(joint_pos_cmd, joint_ids=self.robot_entity_cfg.joint_ids)
+        if self.kinematic_ik_servo:
+            self.robot.write_joint_state_to_sim(
+                joint_pos_cmd,
+                torch.zeros_like(joint_pos_cmd),
+                joint_ids=self.robot_entity_cfg.joint_ids,
+            )
+        return joint_pos_cmd
 
     def _get_rewards(self) -> torch.Tensor:
         reward = 0
@@ -696,18 +717,7 @@ class roboticUSRecEnv(DirectRLEnv):
             # set new command
             self.pose_diff_ik_controller.set_command(base_to_ee_target_pose)
 
-            # get joint position targets
-            US_jacobian = self.robot.root_physx_view.get_jacobians()[
-                :, self.US_ee_jacobi_idx - 1, :, self.robot_entity_cfg.joint_ids
-            ]
-            US_joint_pos = self.robot.data.joint_pos[:, self.robot_entity_cfg.joint_ids]
-            # compute the joint commands
-            joint_pos_des = self.pose_diff_ik_controller.compute(
-                US_ee_pos_b, US_ee_quat_b, US_jacobian, US_joint_pos
-            )
-            self.robot.set_joint_position_target(
-                joint_pos_des, joint_ids=self.robot_entity_cfg.joint_ids
-            )
+            self._apply_ik_command(US_ee_pos_b, US_ee_quat_b)
 
             # set actions into simulator
             self.scene.write_data_to_sim()
